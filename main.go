@@ -2,10 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -15,9 +19,11 @@ import (
 
 const (
 	baseURL          = "https://api.fitbit.com"
+	testEndpoint     = "/1/user/-/profile.json"
 	activityEndpoint = "/1/user/-/activities/date/"
 	sleepEndpoint    = "/1.2/user/-/sleep/date/"
 	weightEndpoint   = "/1/user/-/body/log/weight/date/"
+	refreshEndpoint  = "/oauth2/token"
 )
 
 type ActivitySummary struct {
@@ -65,10 +71,22 @@ type Secret struct {
 	RefreshToken string `json:"fitbit_refresh_token"`
 }
 
+type FailResponce struct {
+	Success bool `json:"success"`
+	Errors  []struct {
+		ErrorType string `json:"errorType"`
+		Message   string `json:"message"`
+	} `json:"errors"`
+}
+
 func main() {
 
-	token, _ := getToken("fitbit", "ap-northeast-1")
+	token, refreshToken := getToken("fitbit", "ap-northeast-1")
 	date := "2021-11-21.json"
+
+	if err := checkToken(token, refreshToken); err != nil {
+		log.Fatal(err)
+	}
 
 	// activity
 	apiEndPoint := baseURL + activityEndpoint + date
@@ -81,7 +99,6 @@ func main() {
 	defer resp.Body.Close()
 
 	byteArray, _ := ioutil.ReadAll(resp.Body)
-
 	var activitySummary ActivitySummary
 	if err := json.Unmarshal(byteArray, &activitySummary); err != nil {
 		os.Exit(1)
@@ -89,8 +106,6 @@ func main() {
 	fmt.Println("ActivityCalories ", activitySummary.Summary.ActivityCalories)
 	fmt.Println("Distance ", activitySummary.Summary.Distances[0].Distance)
 	fmt.Println("Steps ", activitySummary.Summary.Steps)
-
-	fmt.Println(resp.StatusCode)
 
 	//// sleep
 	//apiEndPoint = baseURL + sleepEndpoint + date
@@ -186,4 +201,64 @@ func getToken(secretName, region string) (token, refreshToken string) {
 	}
 
 	return secret.AccessToken, secret.RefreshToken
+}
+
+func checkToken(token, refreshToken string) error {
+	req, _ := http.NewRequest("GET", baseURL+testEndpoint, nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	byteArray, _ := ioutil.ReadAll(resp.Body)
+	var failResponce FailResponce
+	if err := json.Unmarshal(byteArray, &failResponce); err != nil {
+		return err
+	}
+
+	if resp.Status == "200" {
+		return nil
+	} else if resp.Status == "401 Unauthorized" && failResponce.Errors[0].ErrorType == "expired_token" {
+		if err := extendTokenPeriod(refreshToken); err != nil {
+			return err
+		}
+		return nil
+	}
+	return errors.New("Unexpected error occured:" + failResponce.Errors[0].ErrorType)
+}
+
+func extendTokenPeriod(refreshToken string) error {
+	params := url.Values{}
+	params.Add("grant_type", `refresh_token`)
+	params.Add("refresh_token", refreshToken)
+	body := strings.NewReader(params.Encode())
+
+	req, err := http.NewRequest("POST", baseURL+refreshEndpoint, body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Basic "+os.Getenv("BASIC"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	byteArray, _ := ioutil.ReadAll(resp.Body)
+	var refreshResponce RefreshResponce
+	if err := json.Unmarshal(byteArray, &refreshResponce); err != nil {
+		return err
+	}
+	if err := setNewToken(refreshResponce.AccessToken, refreshResponce.RefreshToken); err != nil {
+		return err
+	}
+	return nil
+}
+
+func setNewToken(accessToken, refreshToken string) error {
+	// ToDo : Set New Token
+	return nil
 }
