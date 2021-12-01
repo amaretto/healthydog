@@ -18,6 +18,8 @@ import (
 )
 
 const (
+	secretName       = "fitbit"
+	region           = "ap-northeast-1"
 	baseURL          = "https://api.fitbit.com"
 	testEndpoint     = "/1/user/-/profile.json"
 	activityEndpoint = "/1/user/-/activities/date/"
@@ -80,10 +82,11 @@ type FailResponce struct {
 }
 
 func main() {
-
-	token, refreshToken := getToken("fitbit", "ap-northeast-1")
+	token, refreshToken := getToken()
 	date := "2021-11-21.json"
 
+	fmt.Println(token)
+	fmt.Println(refreshToken)
 	if err := checkToken(token, refreshToken); err != nil {
 		log.Fatal(err)
 	}
@@ -107,48 +110,47 @@ func main() {
 	fmt.Println("Distance ", activitySummary.Summary.Distances[0].Distance)
 	fmt.Println("Steps ", activitySummary.Summary.Steps)
 
-	//// sleep
-	//apiEndPoint = baseURL + sleepEndpoint + date
-	//req, _ = http.NewRequest("GET", apiEndPoint, nil)
-	//req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	//resp, err = http.DefaultClient.Do(req)
-	//if err != nil {
-	//	os.Exit(1)
-	//}
-	//defer resp.Body.Close()
+	// sleep
+	apiEndPoint = baseURL + sleepEndpoint + date
+	req, _ = http.NewRequest("GET", apiEndPoint, nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
 
-	//byteArray, _ = ioutil.ReadAll(resp.Body)
+	byteArray, _ = ioutil.ReadAll(resp.Body)
 
-	//var sleepSummary SleepSummary
-	//if err := json.Unmarshal(byteArray, &sleepSummary); err != nil {
-	//	os.Exit(1)
-	//}
-	//fmt.Println("Summary ", sleepSummary.Summary)
-	//fmt.Println("TotalMinutesAsleep ", sleepSummary.Summary.TotalMinutesAsleep)
-	//fmt.Println("TotalTimeInBed ", sleepSummary.Summary.TotalTimeInBed)
+	var sleepSummary SleepSummary
+	if err := json.Unmarshal(byteArray, &sleepSummary); err != nil {
+		os.Exit(1)
+	}
+	fmt.Println("Summary ", sleepSummary.Summary)
+	fmt.Println("TotalMinutesAsleep ", sleepSummary.Summary.TotalMinutesAsleep)
+	fmt.Println("TotalTimeInBed ", sleepSummary.Summary.TotalTimeInBed)
 
-	//// weight
-	//apiEndPoint = baseURL + weightEndpoint + date
-	//req, _ = http.NewRequest("GET", apiEndPoint, nil)
-	//req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	//resp, err = http.DefaultClient.Do(req)
-	//if err != nil {
-	//	os.Exit(1)
-	//}
-	//defer resp.Body.Close()
+	// weight
+	apiEndPoint = baseURL + weightEndpoint + date
+	req, _ = http.NewRequest("GET", apiEndPoint, nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
 
-	//byteArray, _ = ioutil.ReadAll(resp.Body)
-	//var weightSummary WeightSummary
-	//if err := json.Unmarshal(byteArray, &weightSummary); err != nil {
-	//	os.Exit(1)
-	//}
-	//fmt.Println("Weight ", weightSummary.Weight[0].Weight)
-	//fmt.Println("BMI ", weightSummary.Weight[0].Bmi)
+	byteArray, _ = ioutil.ReadAll(resp.Body)
+	var weightSummary WeightSummary
+	if err := json.Unmarshal(byteArray, &weightSummary); err != nil {
+		os.Exit(1)
+	}
+	fmt.Println("Weight ", weightSummary.Weight[0].Weight)
+	fmt.Println("BMI ", weightSummary.Weight[0].Bmi)
 
 }
 
-func getToken(secretName, region string) (token, refreshToken string) {
-
+func getToken() (token, refreshToken string) {
 	sess, err := session.NewSession()
 	if err != nil {
 		fmt.Println(err.Error())
@@ -218,7 +220,7 @@ func checkToken(token, refreshToken string) error {
 		return err
 	}
 
-	if resp.Status == "200" {
+	if resp.Status == "200 OK" {
 		return nil
 	} else if resp.Status == "401 Unauthorized" && failResponce.Errors[0].ErrorType == "expired_token" {
 		if err := extendTokenPeriod(refreshToken); err != nil {
@@ -259,6 +261,45 @@ func extendTokenPeriod(refreshToken string) error {
 }
 
 func setNewToken(accessToken, refreshToken string) error {
-	// ToDo : Set New Token
+	secretString := fmt.Sprintf("{\"fitbit_token\":\"%s\",\"fitbit_refresh_token\":\"%s\"}", accessToken, refreshToken)
+	sess, err := session.NewSession()
+	if err != nil {
+		return err
+	}
+	svc := secretsmanager.New(sess,
+		aws.NewConfig().WithRegion(region))
+	input := &secretsmanager.PutSecretValueInput{
+		SecretId:     aws.String(secretName),
+		SecretString: aws.String(secretString),
+	}
+
+	result, err := svc.PutSecretValue(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case secretsmanager.ErrCodeInvalidParameterException:
+				fmt.Println(secretsmanager.ErrCodeInvalidParameterException, aerr.Error())
+			case secretsmanager.ErrCodeInvalidRequestException:
+				fmt.Println(secretsmanager.ErrCodeInvalidRequestException, aerr.Error())
+			case secretsmanager.ErrCodeLimitExceededException:
+				fmt.Println(secretsmanager.ErrCodeLimitExceededException, aerr.Error())
+			case secretsmanager.ErrCodeEncryptionFailure:
+				fmt.Println(secretsmanager.ErrCodeEncryptionFailure, aerr.Error())
+			case secretsmanager.ErrCodeResourceExistsException:
+				fmt.Println(secretsmanager.ErrCodeResourceExistsException, aerr.Error())
+			case secretsmanager.ErrCodeResourceNotFoundException:
+				fmt.Println(secretsmanager.ErrCodeResourceNotFoundException, aerr.Error())
+			case secretsmanager.ErrCodeInternalServiceError:
+				fmt.Println(secretsmanager.ErrCodeInternalServiceError, aerr.Error())
+			default:
+				fmt.Println(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			fmt.Println(err.Error())
+		}
+	}
+	fmt.Println(result)
 	return nil
 }
