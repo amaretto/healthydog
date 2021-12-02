@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -83,10 +84,8 @@ type FailResponce struct {
 
 func main() {
 	token, refreshToken := getToken()
-	date := "2021-11-21.json"
+	date := time.Now().Format("2006-01-02.json")
 
-	fmt.Println(token)
-	fmt.Println(refreshToken)
 	if err := checkToken(token, refreshToken); err != nil {
 		log.Fatal(err)
 	}
