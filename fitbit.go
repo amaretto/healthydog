@@ -54,7 +54,7 @@ type SleepSummary struct {
 type WeightSummary struct {
 	Weight []struct {
 		Bmi    float64 `json:"bmi"`
-		Weight int     `json:"weight"`
+		Weight float64 `json:"weight"`
 	} `json:"weight"`
 }
 
