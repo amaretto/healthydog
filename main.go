@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,10 +9,22 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/aws/aws-lambda-go/lambda"
 )
 
+type Event struct {
+	ExecutionTime string
+}
+
+func check(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func getFitbitData(dataEndpoint, token string) ([]byte, error) {
-	date := time.Now().AddDate(0, 0, -2).Format("2006-01-02.json")
+	date := time.Now().AddDate(0, 0, -1).Format("2006-01-02.json")
 	apiEndPoint := baseURL + dataEndpoint + date
 	req, _ := http.NewRequest("GET", apiEndPoint, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -25,22 +38,25 @@ func getFitbitData(dataEndpoint, token string) ([]byte, error) {
 	return byteArray, nil
 }
 
-func main() {
+func HandleLambdaEvent(ctx context.Context, event Event) error {
+	targetName := os.Getenv("TARGET_NAME")
+
 	token, refreshToken := getToken()
 	if err := checkToken(token, refreshToken); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// activity
 	byteArray, err := getFitbitData(activityEndpoint, token)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	var activitySummary ActivitySummary
 	if err := json.Unmarshal(byteArray, &activitySummary); err != nil {
 		os.Exit(1)
 	}
-	tags := []string{"test:hoge"}
+	nameTag := fmt.Sprintf("name:%s", targetName)
+	tags := []string{nameTag}
 	check(sendFloatDDMetrics("activityCalories", float64(activitySummary.Summary.ActivityCalories), tags))
 	check(sendFloatDDMetrics("distance", activitySummary.Summary.Distances[0].Distance, tags))
 	check(sendFloatDDMetrics("steps", float64(activitySummary.Summary.Steps), tags))
@@ -52,23 +68,23 @@ func main() {
 	// sleep
 	byteArray, err = getFitbitData(sleepEndpoint, token)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	var sleepSummary SleepSummary
 	if err := json.Unmarshal(byteArray, &sleepSummary); err != nil {
-		os.Exit(1)
+		return err
 	}
 
-	tags = []string{"stage:deep", "test:hoge"}
+	tags = []string{"stage:deep", nameTag}
 	check(sendFloatDDMetrics("Sleep", float64(sleepSummary.Summary.Stages.Deep), tags))
-	tags = []string{"stage:light", "test:hoge"}
+	tags = []string{"stage:light", nameTag}
 	check(sendFloatDDMetrics("Sleep", float64(sleepSummary.Summary.Stages.Light), tags))
-	tags = []string{"stage:rem", "test:hoge"}
+	tags = []string{"stage:rem", nameTag}
 	check(sendFloatDDMetrics("Sleep", float64(sleepSummary.Summary.Stages.Rem), tags))
-	tags = []string{"stage:wake", "test:hoge"}
+	tags = []string{"stage:wake", nameTag}
 	check(sendFloatDDMetrics("Sleep", float64(sleepSummary.Summary.Stages.Wake), tags))
 
-	tags = []string{"test:hoge"}
+	tags = []string{nameTag}
 	check(sendFloatDDMetrics("TotalMinutesAsleep", float64(sleepSummary.Summary.TotalMinutesAsleep), tags))
 	check(sendFloatDDMetrics("TotalTimeInBed", float64(sleepSummary.Summary.TotalTimeInBed), tags))
 
@@ -93,10 +109,9 @@ func main() {
 		check(sendFloatDDMetrics("Weight", weightSummary.Weight[0].Weight, tags))
 		check(sendFloatDDMetrics("BMI", weightSummary.Weight[0].Bmi, tags))
 	}
+	return nil
 }
 
-func check(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
+func main() {
+	lambda.Start(HandleLambdaEvent)
 }
