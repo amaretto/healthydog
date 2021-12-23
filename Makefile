@@ -3,7 +3,7 @@ GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 BINARY_NAME=main
 
-all: build compress
+all: clean build compress
 
 .PHONY: build
 build:
