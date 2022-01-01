@@ -25,6 +25,7 @@ func check(err error) {
 
 func getFitbitData(dataEndpoint, token string) ([]byte, error) {
 	date := time.Now().AddDate(0, 0, -1).Format("2006-01-02.json")
+	fmt.Println("date: ", date)
 	apiEndPoint := baseURL + dataEndpoint + date
 	req, _ := http.NewRequest("GET", apiEndPoint, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
