@@ -15,7 +15,7 @@ jobs:
 
   build:
     needs: setup
-    runs-on: ubuntu-lastest
+    runs-on: ubuntu-latest
     steps:
       - run: echo "start build"
       - uses: actions/checkout@v2
