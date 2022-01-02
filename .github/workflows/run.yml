@@ -20,7 +20,7 @@ jobs:
       - run: echo "start build"
       - uses: actions/checkout@v2
       - name: build
-        run: make build
+        run: make build all
       - run: ls
           
 
