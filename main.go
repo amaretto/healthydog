@@ -63,8 +63,6 @@ func HandleLambdaEvent(ctx context.Context, event Event) error {
 	check(sendFloatDDMetrics("steps", float64(activitySummary.Summary.Steps), tags))
 
 	fmt.Println("ActivityCalories ", activitySummary.Summary.ActivityCalories)
-	fmt.Println("Distance ", activitySummary.Summary.Distances[0].Distance)
-	fmt.Println("Steps ", activitySummary.Summary.Steps)
 
 	// sleep
 	byteArray, err = getFitbitData(sleepEndpoint, token)
@@ -89,10 +87,6 @@ func HandleLambdaEvent(ctx context.Context, event Event) error {
 	check(sendFloatDDMetrics("TotalMinutesAsleep", float64(sleepSummary.Summary.TotalMinutesAsleep), tags))
 	check(sendFloatDDMetrics("TotalTimeInBed", float64(sleepSummary.Summary.TotalTimeInBed), tags))
 
-	fmt.Println("Summary ", sleepSummary.Summary)
-	fmt.Println("TotalMinutesAsleep ", sleepSummary.Summary.TotalMinutesAsleep)
-	fmt.Println("TotalTimeInBed ", sleepSummary.Summary.TotalTimeInBed)
-
 	// weight
 	byteArray, err = getFitbitData(weightEndpoint, token)
 	if err != nil {
@@ -104,8 +98,6 @@ func HandleLambdaEvent(ctx context.Context, event Event) error {
 		os.Exit(1)
 	}
 	if len(weightSummary.Weight) != 0 {
-		fmt.Println("Weight ", weightSummary.Weight[0].Weight)
-		fmt.Println("BMI ", weightSummary.Weight[0].Bmi)
 
 		check(sendFloatDDMetrics("Weight", weightSummary.Weight[0].Weight, tags))
 		check(sendFloatDDMetrics("BMI", weightSummary.Weight[0].Bmi, tags))
