@@ -22,6 +22,3 @@ jobs:
         run: make build
       - run: zip function.zip main
       - run: ls
-
-  deploy:
-    needs: build
