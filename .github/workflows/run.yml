@@ -24,4 +24,4 @@ jobs:
       - name: confirm build&zip result
         run: ls
       - name: deploy
-        run: aws lambda update-function-code --function-name watchdogs --zip-file function.zip
+        run: aws lambda update-function-code --function-name watchdogs --zip-file fileb://function.zip
