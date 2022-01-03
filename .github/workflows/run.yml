@@ -11,6 +11,7 @@ jobs:
         id: go
       - uses: actions/checkout@v2
       - run: go version
+      - run: aws help
       - name: build
         run: make build
       - run: zip function.zip main
