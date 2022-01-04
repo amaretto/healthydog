@@ -36,8 +36,8 @@ func sendFloatDDMetrics(name string, point float64, tags []string) error {
 		return err
 	}
 
-	responseContent, _ := json.MarshalIndent(resp, "", "  ")
-	fmt.Fprintf(os.Stdout, "Response from `MetricsApi.SubmitMetrics`:\n%s\n", responseContent)
+	json.MarshalIndent(resp, "", "  ")
+	//fmt.Fprintf(os.Stdout, "Response from `MetricsApi.SubmitMetrics`:\n%s\n", responseContent)
 	return nil
 }
 
